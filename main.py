@@ -9,8 +9,8 @@ from board import (
     board_has_any_moves,
     board_opponent,
 )
-from move import move_from_string, move_to_string
-
+from move import Move
+from utils import print_board
 
 def main() -> None:
     '''
@@ -31,28 +31,47 @@ def main() -> None:
         print("Player must be B or W.", file=sys.stderr)
         raise SystemExit(1)
 
-    board = board_from_file(board_file)
+    blackBoard, whiteBoard = board_from_file(board_file)
     agent = KonaneAgent(player)
     opponent = board_opponent(player)
 
-    my_move = agent.choose_move(board)
-    print(move_to_string(my_move), flush=True)
-    board = board_apply_move(board, my_move, player)
+    print_board(blackBoard, whiteBoard)
+
+    my_move = agent.choose_move(blackBoard, whiteBoard)
+    print("\nAgent chose: " + str(my_move), flush=True)
+    blackBoard, whiteBoard = board_apply_move(blackBoard, whiteBoard, my_move)
+
+    print()
+    print_board(blackBoard, whiteBoard)
+    print()
 
     for line in sys.stdin:
         opponent_text = line.strip()
         if not opponent_text:
             continue
 
-        opponent_move = move_from_string(opponent_text)
-        board = board_apply_move(board, opponent_move, opponent)
+        opponent_move = Move.from_string(opponent_text)
+        blackBoard, whiteBoard = board_apply_move(blackBoard, whiteBoard, opponent_move)
 
-        if not board_has_any_moves(board, player):
+        print()
+        print_board(blackBoard, whiteBoard)
+        print()
+
+        if not board_has_any_moves(blackBoard, whiteBoard, player):
+            print("Game over!")
             break
 
-        my_move = agent.choose_move(board)
-        print(move_to_string(my_move), flush=True)
-        board = board_apply_move(board, my_move, player)
+        my_move = agent.choose_move(blackBoard, whiteBoard)
+        print("Agent chose: " + str(my_move), flush=True)
+        blackBoard, whiteBoard = board_apply_move(blackBoard, whiteBoard, my_move)
+
+        print()
+        print_board(blackBoard, whiteBoard)
+        print()
+
+        if not board_has_any_moves(blackBoard, whiteBoard, opponent):
+            print("Game over!")
+            break
 
 
 if __name__ == "__main__":
