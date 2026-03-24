@@ -1,5 +1,6 @@
 from typing import Tuple
 
+from utils import coord_to_chess, chess_to_coord
 
 class Move:
      # Stores a move with a start position and optional end position
@@ -8,51 +9,47 @@ class Move:
     - make moves 
     - identifies opening moves 
     - converts moves to/from string format (eg: "D5" or "F5-D5" (for now at least))
-    - Moves are represeneted as (row, col) 
+    - Moves are represented as (row, col) 
     '''
-    pass
+    
+    def __init__(self, start: Tuple[int, int], end: Tuple[int, int] = None):
+        """
+        Creates a new Move from start to end. End may be omitted to indicate the first move
+        in the game where one of the center pieces is removed.
+        """
+        self.start = start
+        self.end = end
+
+    @classmethod
+    def from_string(cls, move_str: str):
+        """Creates a Move from a string representing the move."""
+        move_str = move_str.strip().upper()
+
+        if "-" in move_str: # String represents a jump
+            parts = move_str.split("-", 1)
+            src = chess_to_coord(parts[0])
+            dst = chess_to_coord(parts[1])
+
+            return cls(src, dst)
+        
+        else:
+            return cls(chess_to_coord(move_str))
 
 
-def init_move(move: Move, start: Tuple[int, int], end) -> None:
-    move.start = start
-    move.end = end
-
-
-def create_move(start: Tuple[int, int], end) -> Move:
-     # Stores a move with a start position and optional end position
-    move = Move()
-    init_move(move, start, end)
-    return move
-
-
-def move_is_removal(move: Move) -> bool:
-    # removal move has no destination 
-    return move.end is None
-
-
-def move_to_string(move: Move) -> str:
-    from board import board_index_to_square
-
-    if move_is_removal(move):
-        return board_index_to_square(move.start[0], move.start[1])
-
-    return (
-        board_index_to_square(move.start[0], move.start[1])
-        + "-"
-        + board_index_to_square(move.end[0], move.end[1])
-    )
-
-
-def move_from_string(text: str) -> Move:
-      # Parse string input into a Move object
-    from board import board_square_to_index
-
-    cleaned = text.strip().upper()
-
-    if "-" in cleaned:
-        parts = cleaned.split("-", 1)
-        src = board_square_to_index(parts[0])
-        dst = board_square_to_index(parts[1])
-        return create_move(src, dst)
-
-    return create_move(board_square_to_index(cleaned), None)
+    def is_removal(self) -> bool:
+        """Returns True if there is no destination for this move."""
+        return self.end is None
+    
+    def __str__(self):
+        """
+        Returns the move using chess notation to denote the spaces.
+        If the move is a removal, only one coordinate is returned, otherwise it is formatted A1-A3
+        """
+        if self.is_removal():
+            return coord_to_chess(self.start[0], self.start[1])
+        
+        return (
+            coord_to_chess(self.start[0], self.start[1])
+            + "-"
+            + coord_to_chess(self.end[0], self.end[1])
+        )
