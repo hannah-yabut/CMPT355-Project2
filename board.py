@@ -171,8 +171,10 @@ def board_legal_jumps(blackBoard: int, whiteBoard: int, player: str) -> List[Mov
     # Move the entire board at once and find valid moves
     for l_shift, mask, d_row, d_col in directions:
         # player_bits & mask checks the player's starting positions and prevents wraparound.
-        # opp_bits >> shift checks if there's an opponent in the path.
-        # empty >> (shift * 2) ensures there's an empty space on the other side.
+        # opp_bits << offset checks if there's an opponent in the path.
+        # empty << 1 ensures there's an empty space on the other side.
+        # Odd and even rows have to be checked separately because of the alternating nature of the board
+        # and the use of two separate, non-overlapping bitboards.
 
         if d_col == -2: # Left jump
             # Even rows: Victim is at << (1 - offset)
