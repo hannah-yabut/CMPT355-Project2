@@ -1,20 +1,8 @@
-from board import (
-    BOARD_BLACK,
-    BOARD_WHITE,
-    BOARD_EMPTY,
-    board_apply_move,
-    board_count_pieces,
-    board_from_file,
-    board_has_any_moves,
-    board_index_to_square,
-    board_legal_moves,
-    board_piece_at,
-    board_square_to_index,
-)
-from move import create_move, move_from_string, move_is_removal, move_to_string
-from game_state import create_game_state, game_state_legal_moves, game_state_next_state
+from board import *
+from move import Move
+from game_state import GameState
 from agent import KonaneAgent
-
+from utils import print_board, chess_to_coord, coord_to_chess
 
 def print_separator(title: str) -> None:
     print("\n" + "=" * 60)
@@ -22,115 +10,110 @@ def print_separator(title: str) -> None:
     print("=" * 60)
 
 
-def print_board(board) -> None:
-    for row in board.grid:
-        print(" ".join(row))
-
-
 def test_move_module() -> None:
     print_separator("TEST 1: MOVE MODULE")
 
-    m1 = create_move((3, 3), None)
+    m1 = Move((3, 3), None)
     print("Created removal move:")
     print(" start =", m1.start)
     print(" end   =", m1.end)
-    print(" is removal =", move_is_removal(m1))
-    print(" string =", move_to_string(m1))
+    print(" is removal =", m1.is_removal())
+    print(" string =", str(m1))
 
-    m2 = move_from_string("F5-D5")
+    m2 = Move.from_string("F5-D5")
     print("\nParsed jump move from string 'F5-D5':")
     print(" start =", m2.start)
     print(" end   =", m2.end)
-    print(" is removal =", move_is_removal(m2))
-    print(" string =", move_to_string(m2))
+    print(" is removal =", m2.is_removal())
+    print(" string =", str(m2))
 
 
 def test_board_module(board_file: str) -> None:
     print_separator("TEST 2: BOARD MODULE")
 
-    board = board_from_file(board_file)
+    black, white = board_from_file(board_file)
 
     print("Loaded board:")
-    print_board(board)
+    print_board(black, white)
 
     print("\nPiece counts:")
-    print(" Black =", board_count_pieces(board, BOARD_BLACK))
-    print(" White =", board_count_pieces(board, BOARD_WHITE))
+    print(" Black =", board_count_pieces(black))
+    print(" White =", board_count_pieces(white))
 
     print("\nCoordinate conversion checks:")
-    print(" D5 ->", board_square_to_index("D5"))
-    print(" (3,3) ->", board_index_to_square(3, 3))
+    print(" D5 ->", chess_to_coord("D5"))
+    print(" (3,3) ->", coord_to_chess(3, 3))
 
     print("\nLegal moves for Black:")
-    black_moves = board_legal_moves(board, BOARD_BLACK)
+    black_moves = board_legal_moves(black, white, BOARD_BLACK)
     for move in black_moves:
-        print(" ", move_to_string(move))
+        print(" ", str(move))
 
     print("\nLegal moves for White:")
-    white_moves = board_legal_moves(board, BOARD_WHITE)
+    white_moves = board_legal_moves(black, white, BOARD_WHITE)
     for move in white_moves:
-        print(" ", move_to_string(move))
+        print(" ", str(move))
 
     print("\nHas any moves:")
-    print(" Black =", board_has_any_moves(board, BOARD_BLACK))
-    print(" White =", board_has_any_moves(board, BOARD_WHITE))
+    print(" Black =", board_has_any_moves(black, white, BOARD_BLACK))
+    print(" White =", board_has_any_moves(black, white, BOARD_WHITE))
 
     if len(black_moves) > 0:
         first_move = black_moves[0]
-        print("\nApplying first Black move:", move_to_string(first_move))
-        new_board = board_apply_move(board, first_move, BOARD_BLACK)
+        print("\nApplying first Black move:", str(first_move))
+        new_black, new_white = board_apply_move(black, white, first_move)
 
         print("Board after move:")
-        print_board(new_board)
+        print_board(new_black, new_white)
 
         row, col = first_move.start
-        print("\nSquare moved from now contains:", board_piece_at(new_board, row, col))
-        print("Black count after move:", board_count_pieces(new_board, BOARD_BLACK))
-        print("White count after move:", board_count_pieces(new_board, BOARD_WHITE))
+        print("\nSquare moved from now contains:", board_piece_at(new_black, new_white, row, col))
+        print("Black count after move:", board_count_pieces(new_black))
+        print("White count after move:", board_count_pieces(new_white))
 
 
 def test_game_state_module(board_file: str) -> None:
     print_separator("TEST 3: GAME STATE MODULE")
 
-    board = board_from_file(board_file)
-    state = create_game_state(board, BOARD_BLACK)
+    black, white = board_from_file(board_file)
+    state = GameState(black, white, BOARD_BLACK)
 
     print("Current player:", state.player_to_move)
 
-    moves = game_state_legal_moves(state)
+    moves = state.get_legal_moves()
     print("Legal moves:")
     for move in moves:
-        print(" ", move_to_string(move))
+        print(" ", str(move))
 
     if len(moves) > 0:
-        next_state = game_state_next_state(state, moves[0])
-        print("\nAfter applying:", move_to_string(moves[0]))
+        next_state = state.get_result_state(moves[0])
+        print("\nAfter applying:", str(moves[0]))
         print("Next player:", next_state.player_to_move)
         print("Next board:")
-        print_board(next_state.board)
+        print_board(next_state.black_board, next_state.white_board)
 
 
 def test_agent_module(board_file: str) -> None:
     print_separator("TEST 4: AGENT MODULE")
 
-    board = board_from_file(board_file)
+    black, white = board_from_file(board_file)
 
     print("Initial board:")
-    print_board(board)
+    print_board(black, white)
 
     agent_black = KonaneAgent(BOARD_BLACK)
-    chosen_move = agent_black.choose_move(board)
+    chosen_move = agent_black.choose_move(black, white)
 
     print("\nAgent playing Black chose move:")
-    print(" ", move_to_string(chosen_move))
+    print(" ", str(chosen_move))
 
-    new_board = board_apply_move(board, chosen_move, BOARD_BLACK)
+    new_black, new_white = board_apply_move(black, white, chosen_move)
     print("\nBoard after agent move:")
-    print_board(new_board)
+    print_board(new_black, new_white)
 
     print("\nPiece counts after agent move:")
-    print(" Black =", board_count_pieces(new_board, BOARD_BLACK))
-    print(" White =", board_count_pieces(new_board, BOARD_WHITE))
+    print(" Black =", board_count_pieces(new_black))
+    print(" White =", board_count_pieces(new_white))
 
 
 def main() -> None:
