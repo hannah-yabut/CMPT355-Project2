@@ -10,12 +10,8 @@ from board import (
     board_legal_moves,
     board_opponent,
 )
-from game_state import (
-    create_game_state,
-    game_state_legal_moves,
-    game_state_next_state,
-)
-from move import Move, move_is_removal
+from game_state import GameState
+from move import Move
 
 
 THINKING_TIME = 9.0
@@ -26,7 +22,7 @@ class KonaneAgent:
     Implements the agent, this is the class' current behaviour: 
     - selects a move from available legal moves 
     - uses first legal move first 
-    Built to extend with Alpha Bete pruning algorithm when implemented 
+    Built to extend with Alpha Beta pruning algorithm when implemented 
     '''
     def __init__(self, me: str, max_depth: int = 4) -> None:
         self.me = me.upper()
@@ -34,18 +30,18 @@ class KonaneAgent:
         self.max_depth = max_depth
         self.start_time = 0.0
 
-    def choose_move(self, board) -> Move:
+    def choose_move(self, blackBoard: int, whiteBoard: int) -> Move:
         self.start_time = time.time()
 
-        state = create_game_state(board, self.me)
-        legal = game_state_legal_moves(state)
+        state = GameState(blackBoard, whiteBoard, self.me)
+        legal = state.get_legal_moves()
 
         if not legal:
             raise RuntimeError("No legal moves available.")
 
         ordered_moves = sorted(
             legal,
-            key=lambda mv: self.quick_move_score(board, mv),
+            key=lambda mv: self.quick_move_score(blackBoard, whiteBoard, mv),
             reverse=True,
         )
 
@@ -58,7 +54,7 @@ class KonaneAgent:
             if self.time_up():
                 break
 
-            next_state = game_state_next_state(state, move)
+            next_state = state.get_result_state(move)
             score = self.alphabeta(
                 next_state,
                 self.max_depth - 1,
@@ -75,11 +71,11 @@ class KonaneAgent:
 
         return best_move
 
-    def alphabeta(self, state, depth: int, alpha: float, beta: float, maximizing: bool) -> float:
+    def alphabeta(self, state: GameState, depth: int, alpha: float, beta: float, maximizing: bool) -> float:
         if self.time_up() or depth == 0:
-            return self.evaluate(state.board)
+            return self.evaluate(state.black_board, state.white_board)
 
-        legal = game_state_legal_moves(state)
+        legal = state.get_legal_moves()
 
         if not legal:
             if state.player_to_move == self.me:
@@ -88,10 +84,10 @@ class KonaneAgent:
 
         if maximizing:
             value = -math.inf
-            ordered = self.order_moves(state.board, legal, self.me, True)
+            ordered = self.order_moves(state.black_board, state.white_board, legal, self.me, True)
 
             for move in ordered:
-                next_state = game_state_next_state(state, move)
+                next_state = state.get_result_state(move)
                 value = max(value, self.alphabeta(next_state, depth - 1, alpha, beta, False))
                 alpha = max(alpha, value)
 
@@ -101,10 +97,10 @@ class KonaneAgent:
             return value
 
         value = math.inf
-        ordered = self.order_moves(state.board, legal, self.opp, False)
+        ordered = self.order_moves(state.black_board, state.white_board, legal, self.opp, False)
 
         for move in ordered:
-            next_state = game_state_next_state(state, move)
+            next_state = state.get_result_state(move)
             value = min(value, self.alphabeta(next_state, depth - 1, alpha, beta, True))
             beta = min(beta, value)
 
@@ -113,34 +109,35 @@ class KonaneAgent:
 
         return value
 
-    def order_moves(self, board, moves: List[Move], player: str, reverse: bool) -> List[Move]:
+    def order_moves(self, black: int, white: int, moves: List[Move],
+                    player: str, reverse: bool) -> List[Move]:
         def score(move: Move) -> int:
-            new_board = board_apply_move(board, move, player)
-            my_moves = len(board_legal_moves(new_board, self.me))
-            opp_moves = len(board_legal_moves(new_board, self.opp))
+            new_white, new_black = board_apply_move(black, white, move)
+            my_moves = len(board_legal_moves(new_black, new_white, self.me))
+            opp_moves = len(board_legal_moves(new_black, new_white, self.opp))
             return 4 * (my_moves - opp_moves) + self.move_distance(move)
 
         return sorted(moves, key=score, reverse=reverse)
 
-    def quick_move_score(self, board, move: Move) -> int:
-        new_board = board_apply_move(board, move, self.me)
-        my_moves = len(board_legal_moves(new_board, self.me))
-        opp_moves = len(board_legal_moves(new_board, self.opp))
+    def quick_move_score(self, black: int, white: int, move: Move) -> int:
+        new_black, new_white = board_apply_move(black, white, move)
+        my_moves = len(board_legal_moves(new_black, new_white, self.me))
+        opp_moves = len(board_legal_moves(new_black, new_white, self.opp))
         return 4 * (my_moves - opp_moves) + self.move_distance(move)
 
     def move_distance(self, move: Move) -> int:
-        if move_is_removal(move):
+        if move.is_removal():
             return 0
 
         r1, c1 = move.start
         r2, c2 = move.end
         return abs(r1 - r2) + abs(c1 - c2)
 
-    def evaluate(self, board) -> int:
-        my_moves = len(board_legal_moves(board, self.me))
-        opp_moves = len(board_legal_moves(board, self.opp))
-        my_pieces = board_count_pieces(board, self.me)
-        opp_pieces = board_count_pieces(board, self.opp)
+    def evaluate(self, black: int, white: int) -> int:
+        my_moves = len(board_legal_moves(black, white, self.me))
+        opp_moves = len(board_legal_moves(black, white, self.opp))
+        my_pieces = board_count_pieces(black)
+        opp_pieces = board_count_pieces(white)
 
         return 10 * (my_moves - opp_moves) + 2 * (my_pieces - opp_pieces)
 
