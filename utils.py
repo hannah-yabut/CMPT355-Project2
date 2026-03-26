@@ -3,22 +3,22 @@
 from typing import Tuple
 
 BOARD_SIZE = 8
-
+#redid the print_board to accomodate 64 bit board -j
 def print_board(blackBoard: int, whiteBoard: int) -> None:
     boards = [blackBoard, whiteBoard]
-
+    board_print = ""
     for row in range(BOARD_SIZE):
+        rowPrint = f""
         for col in range(BOARD_SIZE):
-            color = (row + col) % 2 # 0 for black, 1 for white
-            shift = (row * 4) + (col // 2)
-
-            if (boards[color] >> shift) & 1:
-                print("B " if color == 0 else "W ", end = "")
-
+            shift = 1 << (row * 8 + col)
+            if blackBoard & shift:
+                rowPrint += "B "
+            elif whiteBoard & shift:
+                rowPrint += "W "
             else:
-                print("O ", end = "")
-        
-        print()
+                rowPrint += "O "
+        board_print += rowPrint + "\n"
+    board_print += "\n"
 
 
 def chess_to_coord(square: str) -> Tuple[int, int]:

@@ -67,7 +67,8 @@ def test_board_module(board_file: str) -> None:
         print_board(new_black, new_white)
 
         row, col = first_move.start
-        print("\nSquare moved from now contains:", board_piece_at(new_black, new_white, row, col))
+        #board_piece_at to remove
+        '''print("\nSquare moved from now contains:", board_piece_at(new_black, new_white, row, col))'''
         print("Black count after move:", board_count_pieces(new_black))
         print("White count after move:", board_count_pieces(new_white))
 

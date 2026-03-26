@@ -6,26 +6,8 @@ from utils import BOARD_SIZE
 BOARD_EMPTY = "O"
 BOARD_BLACK = "B"
 BOARD_WHITE = "W"
+# getting rid of the board lookup -j
 
-# This lookup table contains (board, shift) tuples where board is the color of the board
-# at that position (0 for black, 1 for white) and shift is an integer which can be used
-# with a bitshift operation to reach the space at that row and column.
-BOARD_LOOKUP = [[None for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
-
-# The same thing but inverse; converts a color index and bit shift into a row, column pair.
-COORD_LOOKUP = [
-    [None for _ in range(BOARD_SIZE ** 2 // 2)], 
-    [None for _ in range(BOARD_SIZE ** 2 // 2)]
-]
-
-# Initialize the tables
-for col in range(BOARD_SIZE):
-    for row in range(BOARD_SIZE):
-        color = ((col % 2) + (row % 2)) % 2 # 0 for black, 1 for white
-        shift = row * 4 + col // 2  # The boards are opposite each other and each have 32 spaces
-
-        BOARD_LOOKUP[row][col] = (color, shift)
-        COORD_LOOKUP[color][shift] = (row, col)
 
 
 def board_from_file(filename: str) -> tuple[int, int]:
@@ -41,51 +23,39 @@ def board_from_file(filename: str) -> tuple[int, int]:
         if len(row) != BOARD_SIZE:
             raise ValueError("Board file must contain exactly 8 rows of 8 characters.")
 
-    blackBoard, whiteBoard = 0x00000000, 0x00000000
+    #changing this to starting as 0,0 -j
+    #initializing the boards
+    blackBoard, whiteBoard = 0,0
 
     for row in range(BOARD_SIZE):
         for col in range(BOARD_SIZE):
             cell = rows[row][col]
-
             if cell != BOARD_BLACK and cell != BOARD_WHITE and cell != BOARD_EMPTY:
                 raise ValueError("Board file may only contain B, W, or O.")
-            
             else:
-                state = 1 if (cell == BOARD_BLACK or cell == BOARD_WHITE) else 0    # 0 for empty
-                color, index = BOARD_LOOKUP[row][col]
-
-                if color == 0:
+                # check B, then W, if neither it stays as 0 -j
+                state = 1   
+                index = row * 8 + col
+                if cell == BOARD_BLACK:
                     blackBoard |= state << index  # This won't SET a bit to 0, but it should already be 0 if empty.
-                else:
+                elif cell == BOARD_WHITE:
                     whiteBoard |= state << index
+                
 
     return blackBoard, whiteBoard
-
 
 def board_opponent(player: str) -> str:
     if player == BOARD_BLACK:
         return BOARD_WHITE
     return BOARD_BLACK
 
-
+#might try to implement mask here, not used anywhere else -j
 def board_in_bounds(row: int, col: int) -> bool:
     return 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE
 
+#getting rid of board_piece_at, only used once for a print function
 
-def board_piece_at(blackBoard: int, whiteBoard: int, row: int, col: int) -> str:
-    """Returns the piece at row, col or O for empty."""
-    color, shift = BOARD_LOOKUP[row][col]
-    
-    if color == 0 and ((blackBoard >> shift) & 1 == 1):
-        return "B"
-    
-    elif color == 1 and ((whiteBoard >> shift) & 1 == 1):
-        return "W"
-    
-    else:
-        return "O"
-
-
+#both of the below work with the 64 bit board
 def board_count_pieces(board: int) -> int:
     """
     Returns the number of pieces in the board. This should be ONE of the boards, not both colors.
@@ -100,7 +70,8 @@ def board_is_initial_removal_phase(blackBoard: int, whiteBoard: int) -> bool:
     """
     total = board_count_pieces(blackBoard) + board_count_pieces(whiteBoard)
 
-    return (total >= 64)    # Change this to 63 if it turns out both players get to remove 1
+    return (total >= 63)    # Change this to 63 if it turns out both players get to remove 1
+    #changed it to 63! -j
 
 
 def board_legal_moves(blackBoard: int, whiteBoard: int, player: str) -> List[Move]:
@@ -113,7 +84,7 @@ def board_legal_moves(blackBoard: int, whiteBoard: int, player: str) -> List[Mov
     
     return board_legal_jumps(blackBoard, whiteBoard, player)
 
-
+#come back to this -j
 def board_legal_removals(player: str) -> List[Move]:
     """
     In this version of Konane, only the agent gets to remove a piece, so we don't need to check the board.
