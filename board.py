@@ -6,6 +6,13 @@ from utils import BOARD_SIZE
 BOARD_EMPTY = "O"
 BOARD_BLACK = "B"
 BOARD_WHITE = "W"
+MASK64 = 0xFFFFFFFFFFFFFFFF
+NOT_A_FILE = 0xFEFEFEFEFEFEFEFE
+NOT_B_FILE = 0xFDFDFDFDFDFDFDFD
+NOT_G_FILE = 0xBFBFBFBFBFBFBFBF
+NOT_H_FILE = 0x7F7F7F7F7F7F7F7F
+NOT_AB_FILE = NOT_A_FILE & NOT_B_FILE
+NOT_GH_FILE = NOT_G_FILE & NOT_H_FILE
 # getting rid of the board lookup -j
 
 
@@ -125,19 +132,31 @@ def board_legal_jumps(blackBoard: int, whiteBoard: int, player: str) -> List[Mov
         opp_bits = blackBoard
         player_color = 1
         offset = 1
-
-    empty = ~player_bits & 0xFFFFFFFF
+    #updated for 64 bit, 
+    empty = ~(player_bits | opp_bits) & MASK64
 
     # Landing shift, victim shift, mask, row delta, and column delta (amount they moved)
     # The masks prevent the edges from wrapping around when shifting left or right.
+    #updating with 64 bit boards in mind
+    '''
     directions = [
         (-4, 0xFFFFFFFF, -2, 0),    # Up
         (4, 0xFFFFFFFF, 2, 0),  # Down
         (-1, 0xEEEEEEEE, 0, -2),    # Left
         (1, 0x77777777, 0, 2)   # Right
     ]
+    '''
+    #doubled the masks for 64 bits
+    directions = [
+        (-8, 0xFFFFFFFFFFFFFFFF, -16, 0),    # Up
+        (8, 0xFFFFFFFFFFFFFFFF, 16, 0),  # Down
+        (-1, NOT_AB_FILE, 0, -2),    # Left
+        (1, NOT_GH_FILE, 0, 2)   # Right    
+        ]
     
     moves = []
+
+    
 
     # Move the entire board at once and find valid moves
     for l_shift, mask, d_row, d_col in directions:
@@ -146,35 +165,26 @@ def board_legal_jumps(blackBoard: int, whiteBoard: int, player: str) -> List[Mov
         # empty << 1 ensures there's an empty space on the other side.
         # Odd and even rows have to be checked separately because of the alternating nature of the board
         # and the use of two separate, non-overlapping bitboards.
-
-        if d_col == -2: # Left jump
-            # Even rows: Victim is at << (1 - offset)
-            # Odd rows:  Victim is at << offset
-            even_j = (player_bits & EVEN_ROWS & mask) & (opp_bits << (1 - offset)) & (empty << 1)
-            odd_j = (player_bits & ODD_ROWS & mask) & (opp_bits << offset) & (empty << 1)
-            jumpable_bits = even_j | odd_j
-
-        elif d_col == 2: # Right jump
-            # Even rows: Victim is at >> offset
-            # Odd rows:  Victim is at >> (1 - offset)
-            even_j = (player_bits & EVEN_ROWS & mask) & (opp_bits >> offset) & (empty >> 1)
-            odd_j = (player_bits & ODD_ROWS & mask) & (opp_bits >> (1 - offset)) & (empty >> 1)
-            jumpable_bits = even_j | odd_j
-        
-        else:   # Up and down jumps
-            if l_shift >= 0:
-                jumpable_bits = (player_bits & mask) & (opp_bits >> l_shift) & (empty >> l_shift * 2)
-            
-            else:
-                l_shift = abs(l_shift)
-                jumpable_bits = (player_bits & mask) & (opp_bits << l_shift) & (empty << l_shift * 2)
+        #l_shift will be the shift value check for opponent board
+        #d_row is for vertical checks
+        #d_col is for horizontal checks
+      
+        #this actually takes care of all 4 cases
+        #this takes care of down and right
+        if l_shift > 0:
+            jumpable_bits = (player_bits & mask) & (opp_bits >> l_shift) & (empty >> l_shift * 2)
+        #this one takes care of left and up
+        else:
+            l_shift = abs(l_shift)
+            jumpable_bits = (player_bits & mask) & (opp_bits << l_shift) & (empty << l_shift * 2)
         
         # Process each possible move found
         while jumpable_bits:
             lowest_bit = jumpable_bits & -jumpable_bits
             idx = lowest_bit.bit_length() - 1   # Effectively gets the index that this bit was at in the binary representation
 
-            s_row, s_col = COORD_LOOKUP[player_color][idx]
+            s_row = idx // 8
+            s_col = idx % 8
             moves.append(Move((s_row, s_col), (s_row + d_row, s_col + d_col)))
 
             jumpable_bits ^= lowest_bit # Remove the bit
