@@ -19,6 +19,7 @@ def print_board(blackBoard: int, whiteBoard: int) -> None:
                 rowPrint += "O "
         board_print += rowPrint + "\n"
     board_print += "\n"
+    print(board_print)
 
 
 def chess_to_coord(square: str) -> Tuple[int, int]:

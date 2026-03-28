@@ -6,6 +6,7 @@ from utils import BOARD_SIZE
 BOARD_EMPTY = "O"
 BOARD_BLACK = "B"
 BOARD_WHITE = "W"
+#added the following to be able to access easily
 MASK64 = 0xFFFFFFFFFFFFFFFF
 NOT_A_FILE = 0xFEFEFEFEFEFEFEFE
 NOT_B_FILE = 0xFDFDFDFDFDFDFDFD
@@ -76,7 +77,7 @@ def board_is_initial_removal_phase(blackBoard: int, whiteBoard: int) -> bool:
     Returns True if the board has 64 pieces.
     """
     total = board_count_pieces(blackBoard) + board_count_pieces(whiteBoard)
-
+    
     return (total >= 63)    # Change this to 63 if it turns out both players get to remove 1
     #changed it to 63! -j
 
@@ -97,16 +98,12 @@ def board_legal_removals(player: str) -> List[Move]:
     In this version of Konane, only the agent gets to remove a piece, so we don't need to check the board.
     The only valid pieces are in the middle 2x2 square. Returns a list containing these Moves.
     """
-    color = 0 if player == "B" else 1
-
-    # There are 4 pieces in a row and the middle squares are in rows 3 and 4 (starting from 0)
-    # Black's middle piece is the second black piece in row 3 but for white it's the third so add 1.
-    row1, col1 = COORD_LOOKUP[color][3 * 4 + 1 + color]
-
-    # The same but for row 4, where black and white are opposite from above.
-    row2 ,col2 = COORD_LOOKUP[color][4 * 4 + 2 - color]
-
-    return [Move((row1, col1)), Move((row2, col2))]
+    if player == BOARD_BLACK:
+        #remove d5 or e4
+        return [Move((3, 3)), Move((4, 4))]
+        #remove e5 or d4
+    else:
+        return [Move((3, 4)), Move((4, 3))]
 
 
 def board_legal_jumps(blackBoard: int, whiteBoard: int, player: str) -> List[Move]:
@@ -117,39 +114,25 @@ def board_legal_jumps(blackBoard: int, whiteBoard: int, player: str) -> List[Mov
     Returns:
         List[Move]: A List of Move objects representing the possible moves
     """
-    
-    EVEN_ROWS = 0x0F0F0F0F
-    ODD_ROWS = 0xF0F0F0F0
-
     if player == BOARD_BLACK:
         player_bits = blackBoard
         opp_bits = whiteBoard
-        player_color = 0
-        offset = 0
 
     else:
         player_bits = whiteBoard
         opp_bits = blackBoard
-        player_color = 1
-        offset = 1
+
     #updated for 64 bit, 
     empty = ~(player_bits | opp_bits) & MASK64
 
     # Landing shift, victim shift, mask, row delta, and column delta (amount they moved)
     # The masks prevent the edges from wrapping around when shifting left or right.
+    
     #updating with 64 bit boards in mind
-    '''
-    directions = [
-        (-4, 0xFFFFFFFF, -2, 0),    # Up
-        (4, 0xFFFFFFFF, 2, 0),  # Down
-        (-1, 0xEEEEEEEE, 0, -2),    # Left
-        (1, 0x77777777, 0, 2)   # Right
-    ]
-    '''
     #doubled the masks for 64 bits
     directions = [
-        (-8, 0xFFFFFFFFFFFFFFFF, -16, 0),    # Up
-        (8, 0xFFFFFFFFFFFFFFFF, 16, 0),  # Down
+        (-8, 0xFFFFFFFFFFFFFFFF, -2, 0),    # Up
+        (8, 0xFFFFFFFFFFFFFFFF, 2, 0),  # Down
         (-1, NOT_AB_FILE, 0, -2),    # Left
         (1, NOT_GH_FILE, 0, 2)   # Right    
         ]
@@ -195,20 +178,30 @@ def board_legal_jumps(blackBoard: int, whiteBoard: int, player: str) -> List[Mov
 def board_apply_move(blackBoard: int, whiteBoard: int, move: Move) -> tuple[int, int]:
     """Tries applying the given move to the board and returns the new state."""
 
-    boards = [blackBoard, whiteBoard]   # Pack for easy access
 
     s_row, s_col = move.start
-    s_color, s_shift = BOARD_LOOKUP[s_row][s_col]
-
-    # Check if the starting square is empty
-    if (boards[s_color] >> s_shift) & 1 == 0:
-        raise ValueError("Move has invalid starting position.")
+    #formula to get index
+    s_idx = s_row * 8 + s_col
     
-    boards[s_color] &= ~(1 << s_shift)  # Remove the piece at the starting position
+    #check if player/turn is blackboard or whiteboard
+    if blackBoard & (1 << s_idx):
+        playerBoard = blackBoard
+        oppBoard = whiteBoard
+        isBlackTurn = True
+    elif whiteBoard & (1 << s_idx):
+        playerBoard = whiteBoard
+        oppBoard = blackBoard
+        isBlackTurn = False
+    else:
+        raise ValueError("Move has invalid starting position.")
+
+
+    
+    playerBoard &= ~(1 << s_idx)  # Remove the piece at the starting position
 
     # If we're just removing a piece from the middle, we're done.
     if move.is_removal():
-        return boards[0], boards[1]
+        return (playerBoard,oppBoard) if isBlackTurn else (oppBoard, playerBoard)
 
     # ----- JUMPING LOGIC -----
     e_row, e_col = move.end
@@ -216,69 +209,56 @@ def board_apply_move(blackBoard: int, whiteBoard: int, move: Move) -> tuple[int,
     if e_row > BOARD_SIZE or e_col > BOARD_SIZE:
         raise ValueError("Jump leaves board bounds.")
     
+    
     # Determine the direction of the jump to check for chains.
-    if s_row == e_row:
-        d_row = 0
-    elif e_row > s_row:
-        d_row = 1
-    else:
-        d_row = -1
 
-    if s_col == e_col:
-        d_col = 0
-    elif e_col > s_col:
-        d_col = 1
-    else:
-        d_col = -1
+# Determine the step direction of the jump (-1, 0, or 1)
+    d_row = 0 if s_row == e_row else (e_row - s_row) // abs(e_row - s_row)
+    d_col = 0 if s_col == e_col else (e_col - s_col) // abs(e_col - s_col)
+    curr_row, curr_col = s_row, s_col
 
-    v_color, v_shift = BOARD_LOOKUP[s_row + d_row][s_col + d_col]
 
-    if (boards[v_color] >> v_shift) & 0:
-        raise ValueError("There is no piece to jump over!")
 
     # Perform as many jumps in a straight line as possible.
-    while True:
-        boards[v_color] &= ~(1 << v_shift)  # Clear the space jumped over
+    while (curr_col, curr_row) != (e_col, e_row):
+        #opponent square values, to check if it can jump over
+        v_row = curr_row + d_row
+        v_col = curr_col + d_col
+        v_idx = v_row * 8 + v_col
 
-        e_row += 2 * d_row
-        e_col += 2 * d_col
+        if not oppBoard & (1 << v_idx):
+            raise ValueError("There is no piece to jump over!")
+        
+        oppBoard &= ~(1 << v_idx)  # Clear the space jumped over
 
-        if e_row > 2 and e_col > 2 and e_row < BOARD_SIZE and e_col < BOARD_SIZE:
-            v_color, v_shift = BOARD_LOOKUP[e_row - d_row][e_col - d_col]   # Check behind the jump
+        curr_row += 2 * d_row
+        curr_col += 2 * d_col
 
-            if (boards[v_color] >> v_shift) & 1 == 0:    # No more chains are possible
-                break
-
-        else:
-            break
-
-    e_row -= 2 * d_row  # Undo the last move (an invalid jump terminates the loop)
-    e_col -= 2 * d_col
     
     # Finally, put the moving piece where it landed
-    e_color, e_shift = BOARD_LOOKUP[e_row][e_col]
-    boards[e_color] |= 1 << e_shift
-
-    return boards[0], boards[1]
+    e_idx = e_row * 8 + e_col
+    playerBoard |= (1 << e_idx)
+    #return corresponding boards
+    if isBlackTurn:
+        return playerBoard, oppBoard
+    else:
+        return oppBoard, playerBoard
 
 
 def board_has_any_moves(blackBoard: int, whiteBoard: int, player: str) -> bool:
     if player == BOARD_BLACK:
         player_bits, opp_bits = blackBoard, whiteBoard
-        offset = 0
 
     else:
         player_bits, opp_bits = whiteBoard, blackBoard
-        offset = 1
 
-    empty = ~player_bits & 0xFFFFFFFF
-
-    # Check up / down. The boards are 32 bits so a shift of 4 bits is one row vertically.
-    if player_bits & (opp_bits >> 4) & (empty >> 8): return True    # Down
-    if player_bits & (opp_bits << 4) & (empty << 8): return True    # Up
+    empty = ~(player_bits | opp_bits) & MASK64
+    # Check up / down. The boards are 64 bits so a shift of 8 bits is one row vertically.
+    if player_bits & (opp_bits >> 8) & (empty >> 16): return True    # Down
+    if player_bits & (opp_bits << 8) & (empty << 16): return True    # Up
 
     # Check left / right. Masks are necessary to ensure pieces don't wrap around to the next row.
-    if (player_bits & 0x77777777) & (opp_bits >> offset) & (empty >> 1): return True
-    if (player_bits & 0xEEEEEEEE) & (opp_bits << (1 - offset)) & (empty << 1): return True
+    if (player_bits & NOT_GH_FILE) & (opp_bits >> 1) & (empty >> 2): return True
+    if (player_bits & NOT_AB_FILE) & (opp_bits << 1) & (empty << 2): return True
 
     return False
