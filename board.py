@@ -168,7 +168,39 @@ def board_legal_jumps(blackBoard: int, whiteBoard: int, player: str) -> List[Mov
 
             s_row = idx // 8
             s_col = idx % 8
+            #landing first jump
+            e_row = s_row + d_row
+            e_col = s_col + d_col
             moves.append(Move((s_row, s_col), (s_row + d_row, s_col + d_col)))
+            curr_e_row = e_row
+            curr_e_col = e_col
+            
+            while True:
+                # Calculate the coordinates of the NEXT opponent and NEXT landing square
+                # d_row // 2 gives us the 1-square step size (-1, 0, or 1)
+                next_opp_r = curr_e_row + (d_row // 2) 
+                next_opp_c = curr_e_col + (d_col // 2)
+                next_land_r = curr_e_row + d_row
+                next_land_c = curr_e_col + d_col
+                
+                # 1. Are we falling off the board?
+                if not (0 <= next_land_r < BOARD_SIZE and 0 <= next_land_c < BOARD_SIZE):
+                    break
+                    
+                next_opp_idx = next_opp_r * 8 + next_opp_c
+                next_land_idx = next_land_r * 8 + next_land_c
+                
+                # 2. Is there an opponent to jump, AND is the landing square empty?
+                if (opp_bits & (1 << next_opp_idx)) and (empty & (1 << next_land_idx)):
+                    curr_e_row = next_land_r
+                    curr_e_col = next_land_c
+                    
+                    # Add this longer chain-jump as a valid legal move
+                    moves.append(Move((s_row, s_col), (curr_e_row, curr_e_col)))
+                else:
+                    # Path is blocked, chain jump is over
+                    break
+            
 
             jumpable_bits ^= lowest_bit # Remove the bit
 
