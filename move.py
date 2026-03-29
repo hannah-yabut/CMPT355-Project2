@@ -13,16 +13,16 @@ class Move:
     '''
     
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int] = None):
-        """
-        Creates a new Move from start to end. End may be omitted to indicate the first move
+        '''
+        makes a new Move from start to end. End may be omitted to indicate the first move
         in the game where one of the center pieces is removed.
-        """
+        '''
         self.start = start
         self.end = end
 
     @classmethod
     def from_string(cls, move_str: str):
-        """Creates a Move from a string representing the move."""
+        #Creates a Move from a string representing the move
         move_str = move_str.strip().upper()
 
         if "-" in move_str: # String represents a jump
@@ -37,19 +37,18 @@ class Move:
 
 
     def is_removal(self) -> bool:
-        """Returns True if there is no destination for this move."""
+        # returns True if there is no destination for this move
         return self.end is None
     
     def __str__(self):
-        """
+        '''
         Returns the move using chess notation to denote the spaces.
         If the move is a removal, only one coordinate is returned, otherwise it is formatted A1-A3
-        """
+        '''
         if self.is_removal():
             return coord_to_chess(self.start[0], self.start[1])
         
         return (
             coord_to_chess(self.start[0], self.start[1])
             + "-"
-            + coord_to_chess(self.end[0], self.end[1])
-        )
+            + coord_to_chess(self.end[0], self.end[1]))

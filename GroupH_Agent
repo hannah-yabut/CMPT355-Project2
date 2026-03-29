@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+'''
+executable for agent 
+Usage for testing with driver: ./drivercheck.pl GroupH_Agent Konanerandomplayer 
+'''
+from main import main 
+if __name__ == "__main__":
+    main()
